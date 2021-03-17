@@ -1,7 +1,7 @@
 [package]
 name = "timetracker"
 version = "0.1.0"
-authors = ["Michael Radziej <michael.radziej@elektrobit.com>"]
+authors = ["Michael Radziej <mir@gith.m1.spieleck.de>"]
 edition = "2018"
 #![feature(type_alias_impl_trait)]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
