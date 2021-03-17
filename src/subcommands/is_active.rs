@@ -35,7 +35,6 @@ pub fn is_active<T: Iterator<Item = io::Result<String>>>(
 mod tests {
     use super::*;
     use crate::utils::setup_line_reader;
-    use std::iter::FromIterator;
 
     #[test]
     fn end_with_break() {

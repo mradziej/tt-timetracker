@@ -214,7 +214,7 @@ pub fn validate_activity<'a, R: BufRead, W: Write>(
                 if let Some(shortname) = data.tags.iter().find_map(shortname_from_tag) {
                     // there is a tag in form =..., so user wants to define a shortcut
                     let is_already_defined =
-                        if let Some((found, found_tags)) = activity_map.get(&shortname) {
+                        if let Some((found, _found_tags)) = activity_map.get(&shortname) {
                             *found == data.activity
                         } else {
                             false

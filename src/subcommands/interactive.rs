@@ -1,4 +1,3 @@
-use crate::collector::CollectResult;
 use crate::error::{TTError, TTErrorKind};
 use crate::log_parser::{is_distributable, Block, BlockData};
 use crate::utils::FileProxy;

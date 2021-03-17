@@ -44,6 +44,7 @@ impl TestData {
         self
     }
 
+    //noinspection ALL
     pub fn with_now(mut self, now: DateTime<Local>) -> Self {
         self.now = now;
         self
@@ -54,6 +55,7 @@ impl TestData {
         self
     }
 
+    //noinspection ALL,RsExternalLinter
     pub fn write_logfile(self, configfile: String) -> Self {
         write!(self.logfile.writer().unwrap(), "{}", configfile).unwrap();
         self

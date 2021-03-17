@@ -193,7 +193,7 @@ fn handle_cutoff_and_distribute(
     summary
         .activities
         .iter()
-        .filter(|(name, (duration, duration_map))| {
+        .filter(|(name, (duration, _duration_map))| {
             !log_parser::is_break(name)
                 && (all || !log_parser::is_distributable(name))
                 && *duration >= cutoff
@@ -438,7 +438,7 @@ fn report_table(
         Box::new(
             summaries
                 .iter()
-                .map(|(date, summary)| format_time(&summary.start).to_string()),
+                .map(|(_date, summary)| format_time(&summary.start).to_string()),
         ),
         "",
     );
@@ -447,7 +447,7 @@ fn report_table(
         Box::new(
             summaries
                 .iter()
-                .map(|(date, summary)| format_time(&summary.end).to_string()),
+                .map(|(_date, summary)| format_time(&summary.end).to_string()),
         ),
         "",
     );
@@ -456,7 +456,7 @@ fn report_table(
         Box::new(
             summaries
                 .iter()
-                .map(|(date, summary)| format_duration(&summary.breaks)),
+                .map(|(_date, summary)| format_duration(&summary.breaks)),
         ),
         "",
     );
@@ -464,14 +464,14 @@ fn report_table(
     // worktime
     let total_worktime = summaries
         .iter()
-        .map(|(date, summary)| summary.work_time)
+        .map(|(_date, summary)| summary.work_time)
         .fold(Duration::zero(), |lhs, rhs| lhs + rhs);
     write_durations(
         "worktime",
         Box::new(
             summaries
                 .iter()
-                .map(|(date, summary)| format_duration(&summary.work_time).to_string()),
+                .map(|(_date, summary)| format_duration(&summary.work_time).to_string()),
         ),
         &format_duration(&total_worktime).to_string(),
     );

@@ -1,5 +1,3 @@
-#![feature(str_split_once)]
-
 use std::io::{BufRead, Write};
 use std::path::PathBuf;
 use std::result::Result;
