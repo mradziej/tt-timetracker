@@ -1,0 +1,31 @@
+[package]
+name = "timetracker"
+version = "0.1.0"
+authors = ["Michael Radziej <michael.radziej@elektrobit.com>"]
+edition = "2018"
+#![feature(type_alias_impl_trait)]
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name="timetracker"
+path="src/lib.rs"
+
+[[bin]]
+name="timetracker"
+path="src/main.rs"
+
+[dependencies]
+chrono = "0.4.11"
+structopt = "0.3.14"
+dirs = "2.0.2"
+itertools = "0.9.0"
+text_io = "0.1.8"
+config = "0.10.1"
+lazy_static = "1.4.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+if_chain = "1.0.1"
+regex = "1.4.4"
+
+[profile.release]
+lto = true
