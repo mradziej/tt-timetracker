@@ -48,7 +48,7 @@ struct FocusInfo {
     num: i16,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 struct TTInfo {
     activity: String,
     shortname: Option<String>,
@@ -143,107 +143,115 @@ pub(crate) fn watch_i3<R: BufRead, W: Write>(
 ) -> Result<(), TTError> {
     let min_visible = chrono::Duration::minutes(3);
     let mut prev_activity: Option<ActivityInfo> = None;
-    let mut prev_focus: HashMap<String, FocusInfo> = HashMap::new();
+    let mut focus_counter: HashMap<String, u16> = HashMap::new();
+    let mut prev_tt_activity: Option<TTInfo> = None;
+    let mut prev_time = chrono::Local::now();
+    const min_count: u16 = 18;
+    const granularity: core::time::Duration = core::time::Duration::from_secs(10);
 
     loop {
         let now = chrono::Local::now();
-        let ws_list = get_workspaces()?;
+        let activity_map: Option<ActivityMap> = activitiesfile
+            .reader()
+            .ok()
+            .and_then(|file| read_activities(file).ok());
+        let tt_activity = get_current_activity(logfile, activitiesfile);
 
-        // track changes in focus per output
-        let focus_wm = ws_list.iter().find(|ws| ws.focused);
-        if let Some(focus_wm) = focus_wm {
-            let focus_output = focus_wm.output.as_str();
-            if !prev_focus.contains_key(focus_output) {
-                prev_focus.insert(
-                    focus_output.to_string(),
-                    FocusInfo {
-                        since: now,
-                        num: focus_wm.num,
-                    },
-                );
-            }
+        if tt_activity != prev_tt_activity {
+            focus_counter.clear();
+            prev_tt_activity = tt_activity;
         } else {
-            prev_focus.clear();
-        }
+            let ws_list = get_workspaces()?;
 
-        // track changes in activity
-        let maybe_focus_activity = focus_wm.map(|ws| ws.activity()).flatten();
-        let maybe_previous_activity_name = prev_activity.as_ref().map(|p| p.activity.as_str());
-        let stable_focus_activity = match (maybe_focus_activity, maybe_previous_activity_name) {
-            (None, _) => {
-                prev_activity = None;
-                None
-            }
-            (Some(focus_activity), None) => {
-                prev_activity = Some(ActivityInfo {
-                    activity: focus_activity.to_string(),
-                    since: now,
-                });
-                None
-            }
-            (Some(focus_activity), Some(prev_activity_name)) => {
-                if focus_activity != prev_activity_name {
-                    prev_activity = Some(ActivityInfo {
-                        activity: focus_activity.to_string(),
-                        since: now,
-                    });
-                    None
-                } else if now.sub(prev_activity.as_ref().unwrap().since) > min_visible {
-                    Some(prev_activity_name)
-                } else {
-                    None
+            // track changes in focus per output
+            let focus_ws = ws_list.iter().find(|ws| ws.focused);
+            let focus_count = match focus_ws {
+                Some(focus_wm) => {
+                    let focus_output = focus_wm.output.as_str();
+                    match focus_counter.get_mut(focus_output) {
+                        None => {
+                            focus_counter.insert(focus_output.to_string(), 1);
+                            1
+                        }
+                        Some(v) => {
+                            let new_count = *v + 1;
+                            *v = new_count;
+                            new_count
+                        }
+                    }
+                }
+                None => 0,
+            };
+
+            // do we have a focus time long enough?
+            if focus_count >= min_count {
+                focus_counter.clear();
+                if tt_activity
+                    .as_ref()
+                    .map(|activity| !is_break(&activity.activity))
+                    .unwrap_or(true)
+                {
+                    match focus_ws
+                        .and_then(|ws| ws.activity())
+                        .map(|name| TTInfo::from_string(activitiesfile, name))
+                    {
+                        None => if_chain! {
+                                // no workspace title, consider to rename the workspace
+                            if focus_ws
+                                .map(|ws| ws.num != 1 && ws.num != 9)
+                                .unwrap_or(true);
+                            if let Some(tt_activity) = &tt_activity;
+                            if tt_activity.activity != "_start";
+                            if let Some(focus_ws) = focus_ws;
+                            if focus_ws.activity().is_none();
+                            if all(&ws_list, |ws| ws.output != focus_ws.output || ws.num == focus_ws.num || ws.activity() != Some(tt_activity.as_workspace_title()));
+                            then {
+                                println!("Workspace {}: {}", focus_ws.num, tt_activity.as_workspace_title());
+                                set_ws_name(focus_ws, tt_activity.as_workspace_title());
+                            }
+                        },
+                        Some(focus_activity) => {
+                            if tt_activity
+                                .as_ref()
+                                .map(|tt| tt.activity != focus_activity.as_workspace_title())
+                                .unwrap_or(true)
+                            {
+                                // workspace title != current activity,  consider to add a tt block
+                                let start = now
+                                    .sub(
+                                        chrono::Duration::from_std(
+                                            granularity * focus_count as u32,
+                                        )
+                                        .map_err(|err| TTError::from(err.to_string()))?,
+                                    )
+                                    .time();
+                                let data = BlockData {
+                                    start,
+                                    activity: focus_activity.activity.to_string(),
+                                    tags: focus_activity.tags(),
+                                    distribute: is_distributable(&focus_activity.activity),
+                                };
+                                add(
+                                    Block::from_data(
+                                        data,
+                                        tt_activity
+                                            .as_ref()
+                                            .map(|tt| tt.activity == "_start")
+                                            .unwrap_or(false),
+                                    ),
+                                    activity_map.as_ref(),
+                                    activitiesfile,
+                                    logfile,
+                                    &start,
+                                    &now,
+                                )?; // TODO really, error
+                            }
+                        }
+                    }
                 }
             }
-        };
-
-        // consider to add a tt block
-        if let Some(stable_focus_activity) = stable_focus_activity {
-            let activity_map: Option<ActivityMap> = activitiesfile
-                .reader()
-                .ok()
-                .and_then(|file| read_activities(file).ok());
-            let tt_activity = get_current_activity(logfile, activitiesfile);
-            let focus_since = prev_activity.as_ref().unwrap().since;
-            if tt_activity.as_ref().map_or(true, |tt| {
-                !is_break(&tt.activity) && tt.as_workspace_title() != stable_focus_activity
-            }) {
-                let focus_activity = TTInfo::from_string(activitiesfile, stable_focus_activity); // TODO: get rid, we only need to know if activity_map has an entry
-                let data = BlockData {
-                    start: focus_since.time(),
-                    activity: focus_activity.activity.to_string(),
-                    tags: focus_activity.tags(),
-                    distribute: is_distributable(stable_focus_activity),
-                };
-                add(
-                    Block::from_data(
-                        data,
-                        tt_activity
-                            .as_ref()
-                            .map_or(false, |ref tt| tt.activity == "_start"),
-                    ),
-                    activity_map.as_ref(),
-                    activitiesfile,
-                    logfile,
-                    &focus_since.time(),
-                    &now,
-                )?; // TODO really, error
-            }
-        } else {
-            if_chain! {
-                // consider to name the focus workspace
-                if let Some(focus_wm) = focus_wm;
-                if focus_wm.num != 1 && focus_wm.num != 9 && focus_wm.activity().is_none();
-                if now.sub(prev_focus.get(focus_wm.output.as_str()).unwrap().since) > min_visible;
-                if let Some(current_activity) = get_current_activity(logfile, activitiesfile).as_ref();
-                if ! is_break(&current_activity.activity) && current_activity.activity != "_start";
-                if all(&ws_list, |wm| wm.output != focus_wm.output || wm.num == focus_wm.num || wm.activity() != Some(current_activity.as_workspace_title()));
-                then {
-                    println!("Workspace {}: {}", focus_wm.num, current_activity.as_workspace_title());
-                    set_ws_name(focus_wm, current_activity.as_workspace_title());
-                }
-            }
         }
-        sleep(core::time::Duration::from_secs(10));
+        sleep(granularity);
     }
 }
 

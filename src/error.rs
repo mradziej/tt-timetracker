@@ -1,8 +1,8 @@
+use core::time::Duration;
 use itertools::Itertools;
 use std::error;
 use std::fmt;
 use std::io;
-
 #[derive(Debug)]
 pub struct TTError {
     pub kind: TTErrorKind,
@@ -17,6 +17,7 @@ pub enum TTErrorKind {
     ActivityConfigError(&'static str),
     ParseError(&'static str, String),
     JsonError(serde_json::Error),
+    Error(String),
 }
 
 impl TTError {
@@ -42,6 +43,7 @@ impl fmt::Display for TTError {
             TTErrorKind::ActivityConfigError(s) => write!(f, "activity file error: {}", s),
             TTErrorKind::ParseError(msg, line) => write!(f, "parse error: {} at: {}", msg, line),
             TTErrorKind::JsonError(err) => write!(f, "json parse error: {}", err),
+            TTErrorKind::Error(err) => write!(f, "other error:  {}", err),
         }?;
         if !self.context.is_empty() {
             write!(f, "\n")?;
@@ -76,6 +78,18 @@ impl std::convert::From<std::io::Error> for TTError {
 impl std::convert::From<serde_json::Error> for TTError {
     fn from(error: serde_json::Error) -> Self {
         TTError::new(TTErrorKind::JsonError(error))
+    }
+}
+
+impl std::convert::From<&dyn std::error::Error> for TTError {
+    fn from(error: &dyn std::error::Error) -> Self {
+        TTError::new(TTErrorKind::Error(error.to_string()))
+    }
+}
+
+impl std::convert::From<String> for TTError {
+    fn from(error: String) -> Self {
+        TTError::new(TTErrorKind::Error(error))
     }
 }
 
