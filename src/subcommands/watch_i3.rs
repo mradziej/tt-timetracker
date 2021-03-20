@@ -84,6 +84,15 @@ impl TTInfo {
         as_str(&self.shortname).unwrap_or_else(|| self.activity.as_str())
     }
 
+    // as an activity for a block to add to the activity log
+    fn as_block_activity(&self) -> String {
+        if self.shortname.is_none() {
+            format!("+{}", self.activity)
+        } else {
+            self.activity.to_string()
+        }
+    }
+
     // provide the tags for a block if we use self.as_tt_activity as activity
     fn tags(&self) -> Vec<String> {
         match self.shortname {
@@ -225,7 +234,7 @@ pub(crate) fn watch_i3<R: BufRead, W: Write>(
                                     .time();
                                 let data = BlockData {
                                     start,
-                                    activity: focus_activity.activity.to_string(),
+                                    activity: focus_activity.as_block_activity(),
                                     tags: focus_activity.tags(),
                                     distribute: is_distributable(&focus_activity.activity),
                                 };
