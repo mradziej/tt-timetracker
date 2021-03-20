@@ -104,7 +104,7 @@ impl FileProxy<BufReader<File>, BufWriter<File>> for NamedFile {
         match File::open(self.pathname()) {
             Ok(f) => Ok(BufReader::new(f)),
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
-                File::open("/dev/null").map(|f| BufReader::new(f))
+                File::open("/dev/null").map(BufReader::new)
             }
             Err(err) => Err(err),
         }
@@ -114,7 +114,7 @@ impl FileProxy<BufReader<File>, BufWriter<File>> for NamedFile {
             .append(true)
             .create(true)
             .open(self.pathname())
-            .map(|f| BufWriter::new(f))
+            .map(BufWriter::new)
     }
     fn new(pathname: PathBuf) -> NamedFile {
         NamedFile { pathname }
@@ -165,11 +165,12 @@ pub struct FakeFile {
 
 // type FakeReader = Chain<BufReader<&'static [u8]>, Cursor<Vec<u8>>>;
 type FakeWriter = BufWriter<RcBuffer>;
+type ReadChain = Chain<BufReader<&'static [u8]>, Cursor<Vec<u8>>>;
 impl FileProxy<Chain<BufReader<&'static [u8]>, Cursor<Vec<u8>>>, FakeWriter> for FakeFile {
     fn pathname(&self) -> &Path {
         self.pathname.as_ref()
     }
-    fn reader(&self) -> io::Result<Chain<BufReader<&'static [u8]>, Cursor<Vec<u8>>>> {
+    fn reader(&self) -> io::Result<ReadChain> {
         let read_source = BufReader::new(self.source);
         let read_buffer = Cursor::new(self.sink.clone().close());
         Ok(read_source.chain(read_buffer))
@@ -197,6 +198,7 @@ impl FakeFile {
     }
 }
 
+#[allow(unused)]
 pub(crate) fn setup_line_reader(
     lines: Vec<&'static str>,
 ) -> Box<dyn Iterator<Item = Result<String, io::Error>>> {
