@@ -1,20 +1,75 @@
-use config::Config;
-use lazy_static;
-use std::io;
+use crate::error::TTError;
+use config::{Config, ConfigError};
 use std::io::BufRead;
+use std::sync::Arc;
 use std::sync::RwLock;
+use std::time::Duration;
 
-lazy_static::lazy_static! {
-    pub static ref SETTINGS: RwLock<Config> = RwLock::new(Config::default());
+#[derive(Debug, Clone)]
+pub struct WatchI3Config {
+    pub granularity: Duration,
+    pub timeblock: Duration,
 }
 
-pub(crate) fn get_settings(mut configfile: impl BufRead) -> io::Result<()> {
-    // let mut settings = Config::default();
-    let mut config_content = String::new();
-    configfile.read_to_string(&mut config_content)?;
-    let config = config::File::from_str(&config_content, config::FileFormat::Toml);
-    if let Err(err) = SETTINGS.write().unwrap().merge(config) {
-        println!("Cannot read config file, ignoring: {:?}", err);
+#[derive(Debug, Clone)]
+pub struct TTConfig {
+    pub prefix: Option<String>,
+    pub watch_i3: WatchI3Config,
+}
+
+const DEFAULT: TTConfig = TTConfig {
+    prefix: None,
+    watch_i3: WatchI3Config {
+        granularity: Duration::from_secs(10),
+        timeblock: Duration::from_secs(120),
+    },
+};
+
+thread_local! {
+    static SETTINGS: RwLock<Arc<TTConfig>> = RwLock::new(Arc::new(TTConfig::default()));
+}
+
+fn or_none<T>(value: Result<T, ConfigError>) -> Result<Option<T>, ConfigError> {
+    match value {
+        Ok(value) => Ok(Some(value)),
+        Err(ConfigError::NotFound(_)) => Ok(None),
+        Err(other) => Err(other),
     }
-    Ok(())
+}
+
+impl TTConfig {
+    pub fn init(mut configfile: impl BufRead) -> Result<(), TTError> {
+        let mut config_content = String::new();
+        configfile.read_to_string(&mut config_content)?;
+        let mut default = Config::default();
+        let config = default.merge(config::File::from_str(
+            &config_content,
+            config::FileFormat::Toml,
+        ))?;
+        let new_config = TTConfig {
+            prefix: or_none(config.get_str("prefix"))?,
+            watch_i3: WatchI3Config {
+                granularity: Duration::from_secs(
+                    config.get_int("watch-i3.granularity").unwrap_or(10) as u64,
+                ),
+                timeblock: Duration::from_secs(
+                    config.get_int("watch-i3.timeblock").unwrap_or(120) as u64
+                ),
+            },
+        };
+        SETTINGS.with(move |settings| {
+            *settings.write().unwrap() = Arc::new(new_config);
+        });
+        Ok(())
+    }
+
+    pub fn get() -> Arc<TTConfig> {
+        SETTINGS.with(|settings| settings.read().unwrap().clone())
+    }
+}
+
+impl Default for TTConfig {
+    fn default() -> Self {
+        DEFAULT.clone()
+    }
 }

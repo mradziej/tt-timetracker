@@ -6,7 +6,6 @@ use std::str;
 use chrono::DateTime;
 use chrono::Local;
 use chrono::NaiveDate;
-use dirs;
 use structopt::StructOpt;
 
 use crate::error::TTError;
@@ -14,7 +13,7 @@ use crate::utils::FileProxy;
 
 use self::subcommands::add::AddOpt;
 use self::subcommands::report::ReportOpt;
-use crate::configfile::get_settings;
+use crate::configfile::TTConfig;
 use crate::subcommands::edit::EditOpt;
 use crate::subcommands::resume::ResumeOpt;
 
@@ -75,7 +74,8 @@ pub fn run<R: BufRead, W: Write, F: FileProxy<R, W>>(
     default_logfile: &F,
     activitiesfile: &F,
 ) -> Result<i32, TTError> {
-    get_settings(configfile.reader()?)?;
+    // we need to hold the config_writer to keep the settings thread safe for tests.
+    let _config_writer = TTConfig::init(configfile.reader()?)?;
     let opt = match args.get(1).map(String::as_str) {
         None => Opt::Interactive,
         Some("-y") => Opt::Report(ReportOpt::from_iter(args)),

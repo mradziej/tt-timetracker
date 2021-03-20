@@ -9,7 +9,7 @@ use std::{
     str,
 };
 
-use crate::configfile;
+use crate::configfile::TTConfig;
 use chrono::Duration;
 use chrono::NaiveTime;
 use chrono::Timelike;
@@ -60,17 +60,24 @@ pub fn format_duration(duration: &chrono::Duration) -> String {
     let hours = (mins / 60) as u16;
     format!("{}:{:02}", hours, mins - hours * 60)
 }
+
 /// if the activity is just a bare jira ticket number, return a proper jira ticket ID
 /// ```
 /// use timetracker::{utils, configfile};
-/// configfile::SETTINGS.write().unwrap().set("prefix", "JIRAPROJECT");
+/// use timetracker::utils::{FakeFile, FileProxy};
+/// use timetracker::configfile::TTConfig;
+/// use std::io::Write;
+/// use std::path::PathBuf;
+/// let configfile = FakeFile::new(PathBuf::from("configfile"));
+/// configfile.writer().unwrap().write("prefix = \"JIRAPROJECT\"".as_bytes());
+/// TTConfig::init(configfile.reader().unwrap()).unwrap();
 /// assert_eq!(utils::resolve_prefix_for_number("234"), "JIRAPROJECT-234");
 /// ```
 pub fn resolve_prefix_for_number(activity: &str) -> String {
     match activity.chars().next() {
-        Some('0'..='9') => match configfile::SETTINGS.read().unwrap().get_str("prefix") {
-            Ok(prefix) => format!("{}-{}", prefix, activity),
-            Err(_) => activity.to_string(),
+        Some('0'..='9') => match &TTConfig::get().prefix {
+            Some(prefix) => format!("{}-{}", prefix, activity),
+            None => activity.to_string(),
         },
         _ => activity.to_string(),
     }
