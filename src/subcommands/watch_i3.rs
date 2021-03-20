@@ -3,10 +3,10 @@ use if_chain::if_chain;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::Deserialize;
-use serde_json;
 use std::io::{BufRead, Write};
 
 use crate::collector::collect_blocks;
+use crate::configfile::TTConfig;
 use crate::error::TTError;
 use crate::log_parser::{is_break, is_distributable, Block, BlockData};
 use crate::subcommands::add::{add, read_activities, ActivityMap};
@@ -81,7 +81,7 @@ impl TTInfo {
 
     // as workspace title, we prefer to use the shortname
     fn as_workspace_title(&self) -> &str {
-        as_str(&self.shortname).unwrap_or(self.activity.as_str())
+        as_str(&self.shortname).unwrap_or_else(|| self.activity.as_str())
     }
 
     // provide the tags for a block if we use self.as_tt_activity as activity
@@ -109,7 +109,7 @@ pub(crate) fn as_str(opt: &Option<String>) -> Option<&str> {
 
 // interface for the runner, adds what is in the opt to the logfile
 // public interface is the function add()
-pub(crate) fn run<'a, R: BufRead, W: Write, F: FileProxy<R, W>>(
+pub(crate) fn run<R: BufRead, W: Write, F: FileProxy<R, W>>(
     _now: &DateTime<Local>,
     default_logfile: &F,
     activitiesfile: &F,
@@ -141,13 +141,11 @@ pub(crate) fn watch_i3<R: BufRead, W: Write>(
     logfile: &impl FileProxy<R, W>,
     activitiesfile: &impl FileProxy<R, W>,
 ) -> Result<(), TTError> {
-    let min_visible = chrono::Duration::minutes(3);
-    let mut prev_activity: Option<ActivityInfo> = None;
     let mut focus_counter: HashMap<String, u16> = HashMap::new();
     let mut prev_tt_activity: Option<TTInfo> = None;
-    let mut prev_time = chrono::Local::now();
-    const min_count: u16 = 18;
-    const granularity: core::time::Duration = core::time::Duration::from_secs(10);
+    let config = TTConfig::get();
+    let granularity = config.watch_i3.granularity;
+    let min_count = (config.watch_i3.timeblock.as_secs() / granularity.as_secs()) as u16;
 
     loop {
         let now = chrono::Local::now();
