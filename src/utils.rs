@@ -184,11 +184,13 @@ impl FileProxy<Chain<BufReader<&'static [u8]>, Cursor<Vec<u8>>>, FakeWriter> for
 }
 
 impl FakeFile {
-    //noinspection RsExternalLinter,RsExternalLinter
+    #[allow(unused)]
     pub(crate) fn close(self) -> Result<String, FromUtf8Error> {
         Ok(String::from_utf8(self.source.to_vec())?
             + String::from_utf8(self.sink.close())?.as_ref())
     }
+
+    #[allow(unused)]
     pub(crate) fn with_content(pathname: PathBuf, content: &'static [u8]) -> FakeFile {
         FakeFile {
             pathname,
