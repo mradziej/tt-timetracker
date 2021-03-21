@@ -1,8 +1,8 @@
 use crate::error::TTError;
 use config::{Config, ConfigError};
+use std::cell::RefCell;
 use std::io::BufRead;
-use std::sync::Arc;
-use std::sync::RwLock;
+use std::rc::Rc;
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
@@ -26,7 +26,7 @@ const DEFAULT: TTConfig = TTConfig {
 };
 
 thread_local! {
-    static SETTINGS: RwLock<Arc<TTConfig>> = RwLock::new(Arc::new(TTConfig::default()));
+    static SETTINGS: RefCell<Rc<TTConfig>> = RefCell::new(Rc::new(TTConfig::default()));
 }
 
 fn or_none<T>(value: Result<T, ConfigError>) -> Result<Option<T>, ConfigError> {
@@ -58,13 +58,13 @@ impl TTConfig {
             },
         };
         SETTINGS.with(move |settings| {
-            *settings.write().unwrap() = Arc::new(new_config);
+            settings.replace(Rc::new(new_config));
         });
         Ok(())
     }
 
-    pub fn get() -> Arc<TTConfig> {
-        SETTINGS.with(|settings| settings.read().unwrap().clone())
+    pub fn get() -> Rc<TTConfig> {
+        SETTINGS.with(|settings| settings.borrow().clone())
     }
 }
 
