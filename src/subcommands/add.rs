@@ -164,7 +164,7 @@ pub fn read_activities<R: BufRead>(configfile: R) -> Result<ActivityMap, TTError
         match (shortname, activity) {
             (None, _) => {
                 return Err(TTError::new(TTErrorKind::ActivityConfigError(
-                    "Config activity lines wrong, correct format is <left> <right>",
+                    "Config activity lines wrong, correct format is <left> <right> or <activity>",
                 )))
             }
             (Some(shortname), None) => {

@@ -43,7 +43,7 @@ fn interactive<R: BufRead, W: Write, F: FileProxy<R, W>>(
         .map_or(false, |c| is_start(&c.final_activity));
     let activities_sorted: Vec<_> = activity_map
         .iter()
-        .filter(|(k, (v, _tags))| *k != v)
+        .filter(|(_k, (_v, tags))| tags.is_empty())
         .sorted()
         .enumerate()
         .collect();
@@ -93,7 +93,9 @@ fn interactive<R: BufRead, W: Write, F: FileProxy<R, W>>(
             let resume_stack =
                 subcommands::resume::find_resume_activities(default_logfile.reader()?);
             for (i, (activity, tags, _offset)) in resume_stack.iter().enumerate() {
-                println!("{:2>} {} {}", i, activity, tags.join(" "));
+                if !is_start(activity) {
+                    println!("{:2>} {} {}", i, activity, tags.join(" "));
+                }
             }
             print!("Resume which? ");
             let cmd: String = read!("{}\n");
