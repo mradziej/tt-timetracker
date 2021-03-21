@@ -28,15 +28,44 @@ pub mod utils;
 mod tests;
 
 #[derive(StructOpt, Debug)]
-#[structopt(name = "tt")]
-enum Opt {
+#[structopt(name = "tt", about = "a command line time tracker")]
+struct Opt {
+    #[structopt(subcommand)]
+    command: Subcommand,
+}
+
+impl Opt {
+    pub fn from(subcommand: Subcommand) -> Self {
+        Self {
+            command: subcommand,
+        }
+    }
+}
+
+#[derive(StructOpt, Debug)]
+enum Subcommand {
+    /// add activities to the log file
     Add(AddOpt),
+
+    /// edit the log file or activities file
     Edit(EditOpt),
+
+    /// create a report
     Report(ReportOpt),
+
+    /// resume the activity before the current one
     Resume(ResumeOpt),
+
+    /// list all activities from the activities file
     List,
+
+    /// enter interactive mode
     Interactive,
+
+    /// is there currently an activity ongoing? For scripts.
     IsActive,
+
+    /// watch focus of i3 workspaces and configure their names or log activities
     WatchI3,
 }
 
@@ -76,28 +105,35 @@ pub fn run<R: BufRead, W: Write, F: FileProxy<R, W>>(
 ) -> Result<i32, TTError> {
     // we need to hold the config_writer to keep the settings thread safe for tests.
     let _config_writer = TTConfig::init(configfile.reader()?)?;
+
     let opt = match args.get(1).map(String::as_str) {
-        None => Opt::Interactive,
-        Some("-y") => Opt::Report(ReportOpt::from_iter(args)),
+        None => Opt::from(Subcommand::Interactive),
+        Some("-y") => Opt::from(Subcommand::Report(ReportOpt::from_iter(args))),
         Some("add") | Some("report") | Some("list") | Some("edit") | Some("resume")
-        | Some("is-active") | Some("watch-i3") => Opt::from_iter(args),
-        Some(_) => Opt::Add(AddOpt::from_iter(args)),
+        | Some("is-active") | Some("watch-i3") | Some("help") | Some("--help") | Some("-h") => {
+            Opt::from_iter(args)
+        }
+        Some(_) => Opt::from(Subcommand::Add(AddOpt::from_iter(args))),
     };
-    match opt {
-        Opt::Add(add_opt) => subcommands::add::run(add_opt, now, default_logfile, activitiesfile),
-        Opt::Edit(edit_opt) => {
+    match opt.command {
+        Subcommand::Add(add_opt) => {
+            subcommands::add::run(add_opt, now, default_logfile, activitiesfile)
+        }
+        Subcommand::Edit(edit_opt) => {
             subcommands::edit::run(edit_opt, now, default_logfile, activitiesfile)
         }
-        Opt::Interactive => subcommands::interactive::run(now, default_logfile, activitiesfile),
-        Opt::List => subcommands::list::run(now, default_logfile, activitiesfile),
-        Opt::Report(report_opt) => {
+        Subcommand::Interactive => {
+            subcommands::interactive::run(now, default_logfile, activitiesfile)
+        }
+        Subcommand::List => subcommands::list::run(now, default_logfile, activitiesfile),
+        Subcommand::Report(report_opt) => {
             subcommands::report::run(report_opt, now, default_logfile, activitiesfile)
         }
-        Opt::Resume(resume_opt) => {
+        Subcommand::Resume(resume_opt) => {
             subcommands::resume::run(resume_opt, now, default_logfile, activitiesfile)
         }
-        Opt::IsActive => subcommands::is_active::run(now, default_logfile, activitiesfile),
-        Opt::WatchI3 => subcommands::watch_i3::run(now, default_logfile, activitiesfile),
+        Subcommand::IsActive => subcommands::is_active::run(now, default_logfile, activitiesfile),
+        Subcommand::WatchI3 => subcommands::watch_i3::run(now, default_logfile, activitiesfile),
     }
 }
 

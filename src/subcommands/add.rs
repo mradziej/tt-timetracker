@@ -18,22 +18,23 @@ use crate::utils::FileProxy;
 #[derive(StructOpt, Debug)]
 pub(crate) struct AddOpt {
     #[structopt(short, long)]
-    // correct activity or timestamp for previous log entry
+    /// correct activity or timestamp of the previous log entry
     pub really: bool,
 
     #[structopt(short, long="time", parse(try_from_str = utils::parse_time))]
-    // use this time instead of the current time
+    /// use this time instead of the current time; format: HH:MM
     pub timestamp: Option<NaiveTime>,
 
     #[structopt(short, long, default_value)]
-    // subtract the given number of minutes
+    /// activity started so many minutes before
     pub ago: i64,
 
     #[structopt(name = "ACTIVITY")]
-    // activity started
+    /// which activity (start with "+" if not in activities file)
     pub activity: Option<String>,
 
     #[structopt(name = "tags")]
+    /// any additional tags; start first tag with "=" to give a shortname
     pub tags: Vec<String>,
 }
 

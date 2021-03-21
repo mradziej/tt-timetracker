@@ -10,15 +10,15 @@ use structopt::StructOpt;
 #[derive(StructOpt, Debug)]
 pub struct EditOpt {
     #[structopt(long)]
-    // edit log for this day (default is today), only for reporting
+    /// edit log for this day (default is today), only for reporting
     pub date: Option<NaiveDate>,
 
     #[structopt(short, long)]
-    // edit yesterday's log
+    /// edit yesterday's log
     pub yesterday: bool,
 
     #[structopt(short, long)]
-    // edit the activities file
+    /// edit the activities file
     pub activities: bool,
 }
 

@@ -25,26 +25,27 @@ use std::collections::hash_map::RandomState;
 #[derive(StructOpt, Debug)]
 pub(crate) struct ReportOpt {
     #[structopt(short, long)]
-    // create a summary in this format
+    /// create a summary in this format (status, short, long, table, tickets, activity, ticket, worktime)
     pub format: Option<SummaryFormat>,
 
     #[structopt(long)]
-    // create report for this day (default is today), only for reporting
+    /// create report for this day
     pub date: Option<NaiveDate>,
 
     #[structopt(short, long)]
-    // create report for yesterday
+    /// create report for yesterday
     pub yesterday: bool,
 
     #[structopt(short, long)]
-    // create report for the calendar week
+    /// create report for the calendar week
     pub week: bool,
 
     #[structopt(short, long, parse(try_from_str = utils::parse_duration))]
-    // tasks with less that duration are distributed
+    /// tasks with less that duration are treated like internal activities; format HH:MM
     pub cutoff: Option<Duration>,
 
     #[structopt(short, long)]
+    /// treat internal activities (the ones starting with "_") like normal activities
     pub all: bool,
 }
 
@@ -84,7 +85,8 @@ impl FromStr for SummaryFormat {
 
 impl std::fmt::Display for ParseSummaryFormatError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        "provided string was not `short` or `long` or `status` or `table` or `tickets`".fmt(f)
+        "available formats are: status, short, long, table, tickets, activity, ticket, worktime"
+            .fmt(f)
     }
 }
 
