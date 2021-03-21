@@ -204,9 +204,6 @@ pub(crate) fn watch_i3<R: BufRead, W: Write>(
                     {
                         None => if_chain! {
                                 // no workspace title, consider to rename the workspace
-                            if focus_ws
-                                .map(|ws| ws.num != 1 && ws.num != 9)
-                                .unwrap_or(true);
                             if let Some(tt_activity) = &tt_activity;
                             if ! is_start(&tt_activity.activity);
                             if let Some(focus_ws) = focus_ws;
