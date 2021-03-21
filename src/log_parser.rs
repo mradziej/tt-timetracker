@@ -37,9 +37,19 @@ pub fn is_distributable(activity: &str) -> bool {
 /// assert_eq!(log_parser::is_break("normal"), false);
 /// assert_eq!(log_parser::is_break("break"), true);
 /// ```
-
 pub fn is_break(activity: &str) -> bool {
     activity == "break" || activity == "end"
+}
+
+/// returns whether this activity is the start of something yet unknown
+/// ```
+/// use timetracker::log_parser;
+/// assert_eq!(log_parser::is_start("start"), true);
+/// assert_eq!(log_parser::is_start("_start"), true);
+/// assert_eq!(log_parser::is_start("break"), false);
+/// ```
+pub fn is_start(activity: &str) -> bool {
+    activity == "start" || activity == "_start"
 }
 
 impl Block {

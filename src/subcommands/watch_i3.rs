@@ -8,7 +8,7 @@ use std::io::{BufRead, Write};
 use crate::collector::collect_blocks;
 use crate::configfile::TTConfig;
 use crate::error::TTError;
-use crate::log_parser::{is_break, is_distributable, Block, BlockData};
+use crate::log_parser::{is_break, is_distributable, is_start, Block, BlockData};
 use crate::subcommands::add::{add, read_activities, ActivityMap};
 use crate::utils::FileProxy;
 use itertools::all;
@@ -208,7 +208,7 @@ pub(crate) fn watch_i3<R: BufRead, W: Write>(
                                 .map(|ws| ws.num != 1 && ws.num != 9)
                                 .unwrap_or(true);
                             if let Some(tt_activity) = &tt_activity;
-                            if tt_activity.activity != "_start";
+                            if ! is_start(&tt_activity.activity);
                             if let Some(focus_ws) = focus_ws;
                             if focus_ws.activity().is_none();
                             if all(&ws_list, |ws| ws.output != focus_ws.output || ws.num == focus_ws.num || ws.activity() != Some(tt_activity.as_workspace_title()));
@@ -243,7 +243,7 @@ pub(crate) fn watch_i3<R: BufRead, W: Write>(
                                         data,
                                         tt_activity
                                             .as_ref()
-                                            .map(|tt| tt.activity == "_start")
+                                            .map(|tt| is_start(&tt.activity))
                                             .unwrap_or(false),
                                     ),
                                     activity_map.as_ref(),

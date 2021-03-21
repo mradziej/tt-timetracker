@@ -1,5 +1,5 @@
 use crate::error::{TTError, TTErrorKind};
-use crate::log_parser::{is_distributable, Block, BlockData};
+use crate::log_parser::{is_distributable, is_start, Block, BlockData};
 use crate::utils::FileProxy;
 use crate::{collector, subcommands};
 use chrono::{DateTime, Local};
@@ -40,7 +40,7 @@ fn interactive<R: BufRead, W: Write, F: FileProxy<R, W>>(
         };
     let really = collected
         .as_ref()
-        .map_or(false, |c| c.final_activity == "_start");
+        .map_or(false, |c| is_start(&c.final_activity));
     let activities_sorted: Vec<_> = activity_map
         .iter()
         .filter(|(k, (v, _tags))| *k != v)

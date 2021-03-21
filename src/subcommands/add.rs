@@ -9,7 +9,7 @@ use structopt::StructOpt;
 
 use crate::collector::collect_blocks;
 use crate::error::{TTError, TTErrorKind};
-use crate::log_parser::{is_break, is_distributable};
+use crate::log_parser::{is_break, is_distributable, is_start};
 use crate::log_parser::{Block, BlockData};
 use crate::subcommands::report::{report, SummaryFormat};
 use crate::utils;
@@ -210,7 +210,10 @@ pub fn validate_activity<'a, R: BufRead, W: Write>(
             data.distribute = is_distributable(data.activity.as_ref());
 
             // now check whether we want to add a new shortcut to the activitiesfile
-            if !data.distribute && !is_break(data.activity.as_ref()) {
+            if !data.distribute
+                && !is_break(data.activity.as_ref())
+                && !is_start(data.activity.as_ref())
+            {
                 if let Some(shortname) = data.tags.iter().find_map(shortname_from_tag) {
                     // there is a tag in form =..., so user wants to define a shortcut
                     let is_already_defined =
@@ -228,7 +231,8 @@ pub fn validate_activity<'a, R: BufRead, W: Write>(
                     }
                 }
             }
-        } else if !data.distribute && !is_break(data.activity.as_ref()) {
+        } else if !data.distribute && !is_break(data.activity.as_ref()) && !is_start(&data.activity)
+        {
             let activity: String = utils::resolve_prefix_for_number(data.activity.as_ref());
 
             // Is this a shortcut in the activitiesfile? then use the data from the activitiesfile.
@@ -244,7 +248,7 @@ pub fn validate_activity<'a, R: BufRead, W: Write>(
                 return Err(TTError::new(TTErrorKind::UsageError(
                     "activity not known, you can add it using the prefix '+'",
                 ))
-                .context(format!("validating activity '{}", activity).to_string()));
+                .context(format!("validating activity {:?}", activity).to_string()));
             }
             data.distribute = is_distributable(data.activity.as_ref());
         }
