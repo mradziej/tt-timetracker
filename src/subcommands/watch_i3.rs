@@ -217,7 +217,9 @@ pub(crate) fn watch_i3<R: BufRead, W: Write>(
                         Some(focus_activity) => {
                             if tt_activity
                                 .as_ref()
-                                .map(|tt| tt.activity != focus_activity.as_workspace_title())
+                                .map(|tt| {
+                                    tt.as_workspace_title() != focus_activity.as_workspace_title()
+                                })
                                 .unwrap_or(true)
                             {
                                 // workspace title != current activity,  consider to add a tt block
