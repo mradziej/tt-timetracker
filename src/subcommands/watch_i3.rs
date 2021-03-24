@@ -195,7 +195,7 @@ pub(crate) fn watch_i3<R: BufRead, W: Write>(
                 focus_counter.clear();
                 if tt_activity
                     .as_ref()
-                    .map(|activity| !is_break(&activity.activity))
+                    .map(|activity| !is_break(&activity.activity) && !is_start(&activity.activity))
                     .unwrap_or(true)
                 {
                     match focus_ws
@@ -205,7 +205,6 @@ pub(crate) fn watch_i3<R: BufRead, W: Write>(
                         None => if_chain! {
                                 // no workspace title, consider to rename the workspace
                             if let Some(tt_activity) = &tt_activity;
-                            if ! is_start(&tt_activity.activity);
                             if let Some(focus_ws) = focus_ws;
                             if focus_ws.activity().is_none();
                             if all(&ws_list, |ws| ws.output != focus_ws.output || ws.num == focus_ws.num || ws.activity() != Some(tt_activity.as_workspace_title()));
@@ -238,19 +237,13 @@ pub(crate) fn watch_i3<R: BufRead, W: Write>(
                                     distribute: is_distributable(&focus_activity.activity),
                                 };
                                 add(
-                                    Block::from_data(
-                                        data,
-                                        tt_activity
-                                            .as_ref()
-                                            .map(|tt| is_start(&tt.activity))
-                                            .unwrap_or(false),
-                                    ),
+                                    Block::from_data(data, false),
                                     activity_map.as_ref(),
                                     activitiesfile,
                                     logfile,
                                     &start,
                                     &now,
-                                )?; // TODO really, error
+                                )?;
                             }
                         }
                     }
