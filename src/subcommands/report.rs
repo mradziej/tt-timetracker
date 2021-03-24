@@ -346,8 +346,15 @@ pub fn report(
                 ()
             }
             SummaryFormat::Activity => {
-                println!("{}", final_shortname.as_ref().unwrap_or(final_activity));
+                println!(
+                    "{}",
+                    match final_shortname {
+                        None => &final_activity,
+                        Some(shortname) => &shortname[1..],
+                    }
+                );
             }
+
             SummaryFormat::Ticket => {
                 println!("{}", final_activity);
             }
