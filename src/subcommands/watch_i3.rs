@@ -1,21 +1,22 @@
+use std::collections::HashMap;
+use std::io::{BufRead, Write};
+use std::ops::Sub;
+use std::process::Command;
+use std::thread::sleep;
+
 use chrono::{self, DateTime, Local};
 use if_chain::if_chain;
+use itertools::all;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::Deserialize;
-use std::io::{BufRead, Write};
 
 use crate::collector::collect_blocks;
 use crate::configfile::TTConfig;
 use crate::error::TTError;
-use crate::log_parser::{is_break, is_distributable, is_start, Block, BlockData};
+use crate::log_parser::{is_break, is_distributable, is_start, Block, BlockData, TTInfo};
 use crate::subcommands::add::{add, read_activities, ActivityMap};
 use crate::utils::FileProxy;
-use itertools::all;
-use std::collections::HashMap;
-use std::ops::Sub;
-use std::process::Command;
-use std::thread::sleep;
 
 #[derive(Copy, Clone, Deserialize, Debug)]
 struct I3Rectangle {
@@ -46,60 +47,6 @@ struct ActivityInfo {
 struct FocusInfo {
     since: DateTime<Local>,
     num: i16,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-struct TTInfo {
-    activity: String,
-    shortname: Option<String>,
-}
-
-impl TTInfo {
-    fn from_string<R: BufRead, W: Write>(
-        activityfile: &impl FileProxy<R, W>,
-        name: &str,
-    ) -> TTInfo {
-        let activity_map = activityfile
-            .reader()
-            .ok()
-            .and_then(|file| read_activities(file).ok());
-        match activity_map.as_ref().and_then(|map| map.get(name)) {
-            Some((activity, tags)) if activity == name => TTInfo {
-                activity: activity.to_string(),
-                shortname: tags.first().map(|s| s.to_string()),
-            },
-            Some((activity, _tags)) => TTInfo {
-                activity: activity.to_string(),
-                shortname: Some(name.to_string()),
-            },
-            None => TTInfo {
-                activity: name.to_string(),
-                shortname: None,
-            },
-        }
-    }
-
-    // as workspace title, we prefer to use the shortname
-    fn as_workspace_title(&self) -> &str {
-        as_str(&self.shortname).unwrap_or_else(|| self.activity.as_str())
-    }
-
-    // as an activity for a block to add to the activity log
-    fn as_block_activity(&self) -> String {
-        if self.shortname.is_none() {
-            format!("+{}", self.activity)
-        } else {
-            self.activity.to_string()
-        }
-    }
-
-    // provide the tags for a block if we use self.as_tt_activity as activity
-    fn tags(&self) -> Vec<String> {
-        match self.shortname {
-            None => vec![],
-            Some(ref s) => vec![format!("={}", s)],
-        }
-    }
 }
 
 lazy_static! {
@@ -241,7 +188,7 @@ pub(crate) fn watch_i3<R: BufRead, W: Write>(
                                     activity_map.as_ref(),
                                     activitiesfile,
                                     logfile,
-                                    &start,
+                                    &now.time(),
                                     &now,
                                 )?;
                             }
