@@ -41,9 +41,10 @@ fn interactive<R: BufRead, W: Write, F: FileProxy<R, W>>(
     let really = collected
         .as_ref()
         .map_or(false, |c| is_start(&c.final_activity));
+    println!("{:?}", activity_map);
     let activities_sorted: Vec<_> = activity_map
         .iter()
-        .filter(|(_k, (_v, tags))| tags.is_empty())
+        .filter(|(k, (v, _tags))| *k != v)
         .sorted()
         .enumerate()
         .collect();
