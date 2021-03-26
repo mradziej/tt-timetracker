@@ -4,7 +4,7 @@ use std::ops::Sub;
 use std::process::Command;
 use std::thread::sleep;
 
-use chrono::{self, DateTime, Local};
+use chrono::{self, DateTime, Local, NaiveTime};
 use if_chain::if_chain;
 use itertools::all;
 use lazy_static::lazy_static;
@@ -83,16 +83,6 @@ fn get_workspaces() -> Result<Vec<I3Workspace>, TTError> {
     Ok(serde_json::from_slice(output.stdout.as_slice())?)
 }
 
-fn get_current_activity<R: BufRead, W: Write>(
-    logfile: &impl FileProxy<R, W>,
-    activityfile: &impl FileProxy<R, W>,
-) -> Option<TTInfo> {
-    let activity = collect_blocks(logfile.reader().ok()?.lines(), None)
-        .ok()??
-        .final_activity;
-    Some(TTInfo::from_string(activityfile, &activity))
-}
-
 pub(crate) fn watch_i3<R: BufRead, W: Write>(
     logfile: &impl FileProxy<R, W>,
     activitiesfile: &impl FileProxy<R, W>,
@@ -109,8 +99,14 @@ pub(crate) fn watch_i3<R: BufRead, W: Write>(
             .reader()
             .ok()
             .and_then(|file| read_activities(file).ok());
-        let tt_activity = get_current_activity(logfile, activitiesfile);
-
+        let collected = (|| {
+            collect_blocks(logfile.reader().ok()?.lines(), None)
+                .ok()
+                .flatten()
+        })();
+        let tt_activity = collected
+            .as_ref()
+            .map(|coll| TTInfo::from_string(activitiesfile, &coll.final_activity));
         if tt_activity != prev_tt_activity {
             focus_counter.clear();
             prev_tt_activity = tt_activity;
@@ -176,7 +172,10 @@ pub(crate) fn watch_i3<R: BufRead, W: Write>(
                                         )
                                         .map_err(|err| TTError::from(err.to_string()))?,
                                     )
-                                    .time();
+                                    .time()
+                                    .max(collected.map_or(NaiveTime::from_hms(0, 0, 0), |coll| {
+                                        coll.final_start
+                                    }));
                                 let data = BlockData {
                                     start,
                                     activity: focus_activity.as_block_activity(),
