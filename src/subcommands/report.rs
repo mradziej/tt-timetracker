@@ -417,7 +417,8 @@ fn report_table(
         .map(|s| {
             activity_map
                 .get(**s)
-                .map(|(s, _)| s.len())
+                .and_then(|(_activity, tags)| tags.first())
+                .map(|s| s.len())
                 .unwrap_or_default()
         })
         .max()
@@ -484,7 +485,7 @@ fn report_table(
         ),
         &format_duration(&total_worktime).to_string(),
     );
-    println!("");
+    println!();
 
     // activities
     for name in activity_names {
