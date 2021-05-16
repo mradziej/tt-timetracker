@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, Write};
 use std::ops::Sub;
 use std::process::Command;
@@ -17,6 +17,7 @@ use crate::error::TTError;
 use crate::log_parser::{is_break, is_distributable, is_start, Block, BlockData, TTInfo};
 use crate::subcommands::add::{add, read_activities, ActivityMap};
 use crate::utils::FileProxy;
+use std::cmp::min;
 
 #[derive(Copy, Clone, Deserialize, Debug)]
 struct I3Rectangle {
@@ -92,6 +93,14 @@ pub(crate) fn watch_i3<R: BufRead, W: Write>(
     let config = TTConfig::get();
     let granularity = config.watch_i3.granularity;
     let min_count = (config.watch_i3.timeblock.as_secs() / granularity.as_secs()) as u16;
+    let min_count_empty =
+        (config.watch_i3.timeblock_empty.as_secs() / granularity.as_secs()) as u16;
+    let mut max_count: u16 = 0;
+    let mut known_ws: HashSet<i16> = get_workspaces()
+        .unwrap_or_default()
+        .iter()
+        .map(|ws| ws.num)
+        .collect();
 
     loop {
         let now = chrono::Local::now();
@@ -109,9 +118,15 @@ pub(crate) fn watch_i3<R: BufRead, W: Write>(
             .map(|coll| TTInfo::from_string(activitiesfile, &coll.final_activity));
         if tt_activity != prev_tt_activity {
             focus_counter.clear();
+            max_count = 0;
             prev_tt_activity = tt_activity;
         } else {
             let ws_list = get_workspaces()?;
+            known_ws = ws_list
+                .iter()
+                .map(|ws| ws.num)
+                .filter(|num| known_ws.contains(num))
+                .collect();
 
             // track changes in focus per output
             let focus_ws = ws_list.iter().find(|ws| ws.focused);
@@ -132,37 +147,40 @@ pub(crate) fn watch_i3<R: BufRead, W: Write>(
                 }
                 None => 0,
             };
+            if focus_count > max_count {
+                max_count = focus_count;
+            }
 
-            // do we have a focus time long enough?
-            if focus_count >= min_count {
-                focus_counter.clear();
-                if tt_activity
-                    .as_ref()
-                    .map(|activity| !is_break(&activity.activity) && !is_start(&activity.activity))
-                    .unwrap_or(true)
+            if let Some(focus_ws) = focus_ws {
+                // new window without title?
+                if !known_ws.contains(&focus_ws.num) && focus_ws.activity().is_none() {
+                    known_ws.insert(focus_ws.num);
+                    if let Some(tt_activity) = &tt_activity {
+                        let new_name = tt_activity.as_workspace_title();
+                        if !is_start(new_name) && !is_break(new_name) {
+                            println!("Workspace {}: {}", focus_ws.num, new_name);
+                            set_ws_name(focus_ws, new_name);
+                        }
+                    }
+                } else if focus_count >= max_count && focus_count >= min(min_count, min_count_empty)
                 {
-                    match focus_ws
-                        .and_then(|ws| ws.activity())
-                        .map(|name| TTInfo::from_string(activitiesfile, name))
-                    {
-                        None => if_chain! {
-                                // no workspace title, consider to rename the workspace
-                            if let Some(tt_activity) = &tt_activity;
-                            if let Some(focus_ws) = focus_ws;
-                            if focus_ws.activity().is_none();
-                            if all(&ws_list, |ws| ws.output != focus_ws.output || ws.num == focus_ws.num || ws.activity() != Some(tt_activity.as_workspace_title()));
-                            then {
-                                println!("Workspace {}: {}", focus_ws.num, tt_activity.as_workspace_title());
-                                set_ws_name(focus_ws, tt_activity.as_workspace_title());
-                            }
-                        },
-                        Some(focus_activity) => {
-                            if tt_activity
-                                .as_ref()
-                                .map(|tt| {
-                                    tt.as_workspace_title() != focus_activity.as_workspace_title()
-                                })
-                                .unwrap_or(true)
+                    let focus_activity = TTInfo::from_string(
+                        activitiesfile,
+                        focus_ws.activity().unwrap_or_default(),
+                    );
+                    let min_required = if focus_activity.as_workspace_title().is_empty() {
+                        min_count_empty
+                    } else {
+                        min_count
+                    };
+                    if focus_count >= min_required {
+                        focus_counter.clear();
+                        max_count = 0;
+
+                        if let Some(tt_activity) = tt_activity {
+                            if !is_break(&tt_activity.activity)
+                                && tt_activity.as_workspace_title()
+                                    != focus_activity.as_workspace_title()
                             {
                                 // workspace title != current activity,  consider to add a tt block
                                 let start = now
@@ -176,14 +194,15 @@ pub(crate) fn watch_i3<R: BufRead, W: Write>(
                                     .max(collected.map_or(NaiveTime::from_hms(0, 0, 0), |coll| {
                                         coll.final_start
                                     }));
+                                let really = is_start(&tt_activity.as_block_activity());
                                 let data = BlockData {
-                                    start,
+                                    start: if really { now.time() } else { start },
                                     activity: focus_activity.as_block_activity(),
                                     tags: focus_activity.tags(),
                                     distribute: is_distributable(&focus_activity.activity),
                                 };
                                 add(
-                                    Block::from_data(data, false),
+                                    Block::from_data(data, really),
                                     activity_map.as_ref(),
                                     activitiesfile,
                                     logfile,

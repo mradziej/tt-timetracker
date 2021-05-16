@@ -9,6 +9,7 @@ use std::time::Duration;
 pub struct WatchI3Config {
     pub granularity: Duration,
     pub timeblock: Duration,
+    pub timeblock_empty: Duration,
 }
 
 #[derive(Debug, Clone)]
@@ -22,6 +23,7 @@ const DEFAULT: TTConfig = TTConfig {
     watch_i3: WatchI3Config {
         granularity: Duration::from_secs(10),
         timeblock: Duration::from_secs(120),
+        timeblock_empty: Duration::from_secs(300),
     },
 };
 
@@ -54,6 +56,9 @@ impl TTConfig {
                 ),
                 timeblock: Duration::from_secs(
                     config.get_int("watch-i3.timeblock").unwrap_or(120) as u64
+                ),
+                timeblock_empty: Duration::from_secs(
+                    config.get_int("watch-i3.timeblock_empty").unwrap_or(600) as u64,
                 ),
             },
         };

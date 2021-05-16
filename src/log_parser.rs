@@ -211,34 +211,50 @@ impl TTInfo {
         activityfile: &impl FileProxy<R, W>,
         name: &str,
     ) -> TTInfo {
-        let activity_map = activityfile
-            .reader()
-            .ok()
-            .and_then(|file| read_activities(file).ok());
-        match activity_map.as_ref().and_then(|map| map.get(name)) {
-            Some((activity, tags)) if activity == name => TTInfo {
-                activity: activity.to_string(),
-                shortname: tags.first().map(|s| s.to_string()),
-            },
-            Some((activity, _tags)) => TTInfo {
-                activity: activity.to_string(),
-                shortname: Some(name.to_string()),
-            },
-            None => TTInfo {
-                activity: name.to_string(),
+        if is_start(name) || name.is_empty() {
+            TTInfo {
+                activity: "start".to_string(),
                 shortname: None,
-            },
+            }
+        } else {
+            let activity_map = activityfile
+                .reader()
+                .ok()
+                .and_then(|file| read_activities(file).ok());
+            match activity_map.as_ref().and_then(|map| map.get(name)) {
+                Some((activity, tags)) if activity == name => TTInfo {
+                    activity: activity.to_string(),
+                    shortname: tags.first().map(|s| s.to_string()),
+                },
+                Some((activity, _tags)) => TTInfo {
+                    activity: activity.to_string(),
+                    shortname: Some(name.to_string()),
+                },
+                None => TTInfo {
+                    activity: name.to_string(),
+                    shortname: None,
+                },
+            }
         }
     }
 
     // as workspace title, we prefer to use the shortname
     pub fn as_workspace_title(&self) -> &str {
-        watch_i3::as_str(&self.shortname).unwrap_or_else(|| self.activity.as_str())
+        let title = watch_i3::as_str(&self.shortname).unwrap_or_else(|| self.activity.as_str());
+        if is_start(title) {
+            ""
+        } else {
+            title
+        }
     }
 
     // as an activity for a block to add to the activity log
     pub fn as_block_activity(&self) -> String {
-        if self.shortname.is_none() {
+        if self.shortname.is_none()
+            && !is_start(&self.activity)
+            && !is_break(&self.activity)
+            && !self.activity.starts_with("_")
+        {
             format!("+{}", self.activity)
         } else {
             self.activity.to_string()
