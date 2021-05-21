@@ -101,6 +101,7 @@ pub(crate) fn watch_i3<R: BufRead, W: Write>(
         .iter()
         .map(|ws| ws.num)
         .collect();
+    let mut prev_focus_name: Option<String> = None;
 
     loop {
         let now = chrono::Local::now();
@@ -176,13 +177,17 @@ pub(crate) fn watch_i3<R: BufRead, W: Write>(
                     if focus_count >= min_required {
                         focus_counter.clear();
                         max_count = 0;
-
+                        let focus_workspace_title = focus_activity.as_workspace_title();
                         if let Some(tt_activity) = tt_activity {
                             if !is_break(&tt_activity.activity)
-                                && tt_activity.as_workspace_title()
-                                    != focus_activity.as_workspace_title()
+                                && tt_activity.as_workspace_title() != focus_workspace_title
+                                && prev_focus_name
+                                    .as_ref()
+                                    .map(|s| s != focus_workspace_title)
+                                    .unwrap_or(true)
                             {
                                 // workspace title != current activity,  consider to add a tt block
+                                prev_focus_name = Some(focus_workspace_title.to_string());
                                 let start = now
                                     .sub(
                                         chrono::Duration::from_std(
